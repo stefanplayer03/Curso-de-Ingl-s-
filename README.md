@@ -1,4 +1,4 @@
-# English AI Master — Fases 1 a 5 (Fundação, Conversação, Teste de Nível, Gamificação, IA real)
+# English AI Master — Fases 1 a 6 (Fundação, Conversação, Teste de Nível, Gamificação, IA real, Revisão Espaçada)
 
 Scaffold inicial do app, seguindo a arquitetura definida no prompt mestre:
 React + Vite + TypeScript + Tailwind + Firebase, Clean Architecture, camadas
@@ -119,6 +119,26 @@ um automaticamente). Pra testar localmente, seria preciso o `netlify dev` (CLI d
 Netlify) rodando as functions — sem isso, `npm run dev` sozinho não acha `/api/chat*`
 e o provider cai no fallback amigável de erro. Não é obrigatório: dá pra desenvolver
 com `VITE_AI_PROVIDER=mock` localmente e testar a IA de verdade só depois do deploy.
+
+## Fase 6 — Flashcards + Revisão Espaçada (novo)
+
+O pilar pedagógico mais forte do prompt mestre: Active Recall + repetição espaçada,
+totalmente automático — o aluno não precisa cadastrar vocabulário manualmente.
+
+- **Fluxo automático**: toda vez que a IA corrige o aluno na Conversação, cada
+  correção vira um cartão na coleção `reviews` (já modelada desde a Fase 1),
+  via `FlashcardService.createFromCorrection` (chamado de dentro de `useConversation`).
+- **`src/constants/spacedRepetition.ts`**: sistema de Leitner simplificado — 6 caixas,
+  intervalos de 1/2/4/7/15/30 dias. Acertar sobe uma caixa; errar volta pra caixa 0.
+- **`src/pages/Review.tsx`**: mostra os cartões vencidos um de cada vez, com efeito de
+  virar a carta (frente: o que você escreveu; verso: a forma correta + explicação).
+- Rota nova: `/revisao`, acessível pelo botão "Revisar cartões" no Dashboard.
+- **`firestore.indexes.json`** (novo arquivo): a consulta de cartões pendentes filtra por
+  `uid` e `nextReviewAt` ao mesmo tempo — isso exige um índice composto no Firestore.
+  **Na primeira vez que você abrir `/revisao`**, se o índice não existir, o Firestore vai
+  jogar um erro no console do navegador com um **link direto** pra criar o índice em 1
+  clique (leva ~2 min pra ficar pronto). Alternativa: se você usa a Firebase CLI, o
+  arquivo já está pronto pra `firebase deploy --only firestore:indexes`.
 
 ## Deploy no Netlify
 
