@@ -1,4 +1,4 @@
-# English AI Master — Fase 1 (Fundação) + Fase 2 (Conversação) + Fase 3 (Teste de Nível)
+# English AI Master — Fases 1 a 4 (Fundação, Conversação, Teste de Nível, Gamificação)
 
 Scaffold inicial do app, seguindo a arquitetura definida no prompt mestre:
 React + Vite + TypeScript + Tailwind + Firebase, Clean Architecture, camadas
@@ -40,8 +40,6 @@ de abstração para IA e Voz (para nunca acoplar direto a Gemini/Vertex).
   (só ler/atualizar existentes) — corrigido para validar `request.resource.data.uid`
   no `create` e `resource.data.uid` no `read/update/delete`.
 
-## Deploy no Netlify
-
 ## Fase 3 — Teste de Nível (novo)
 
 - **`src/pages/PlacementTest.tsx`**: 10 perguntas de múltipla escolha, dificuldade
@@ -55,6 +53,27 @@ de abstração para IA e Voz (para nunca acoplar direto a Gemini/Vertex).
   não completou (`hasCompletedPlacementTest: false`), protegendo Dashboard e Conversação.
 - O nível do teste agora alimenta de verdade a Conversação (fechei o TODO que fixava "A1").
 - Novo campo `hasCompletedPlacementTest` no perfil (`users/{uid}`), `false` por padrão no cadastro.
+
+## Fase 4 — Gamificação (novo)
+
+- **`src/services/gamification.service.ts`**: dá XP (`awardXp`), calcula e persiste o
+  streak diário (`registerDailyActivity` — compara datas de calendário, não horas) e
+  desbloqueia conquistas na coleção `achievements` (id determinístico `uid_achievementId`,
+  evita duplicatas).
+- **`src/hooks/useGamification.ts`**: hook único que os componentes usam. Conquistas de
+  limiar (XP/streak) são checadas automaticamente sempre que o perfil muda em tempo real;
+  conquistas por evento (ex: primeira conversa) são desbloqueadas explicitamente via `unlock()`.
+- **`src/constants/achievements.ts`**: catálogo de conquistas (fácil adicionar novas).
+- **`AchievementToast`**: notificação animada, aparece no topo da tela por 4s ao desbloquear.
+- **`AchievementGrid`**: grade no Dashboard mostrando desbloqueadas (coloridas) e
+  bloqueadas (cinza, com cadeado).
+- **`GamificationBadge`**: XP e streak sempre visíveis na topbar (`AppLayout`).
+- A Conversação agora dá **+10 XP por mensagem** e desbloqueia "Primeira conversa" no
+  primeiro envio.
+- **Simplificação conhecida**: o streak é registrado a cada vez que o `AppLayout` monta
+  (ou seja, a cada troca de página), não só uma vez por dia de fato — é seguro (idempotente),
+  mas gera writes extras no Firestore. Para otimizar depois, dá pra mover esse registro para
+  um contexto global que persiste entre navegações, em vez de rodar por página.
 
 ## Deploy no Netlify
 
