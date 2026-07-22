@@ -2,8 +2,16 @@
   command = "npm run build"
   publish = "dist"
 
-# Necessário para SPA com React Router: qualquer rota cai no index.html
-# e o roteamento do lado do cliente assume a partir daí.
+[functions]
+  directory = "netlify/functions"
+
+# Atalho amigável: o front-end chama /api/chat em vez do caminho longo do Netlify Functions.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback: qualquer rota que não seja arquivo estático nem função cai no index.html.
 [[redirects]]
   from = "/*"
   to = "/index.html"

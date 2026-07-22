@@ -1,4 +1,4 @@
-# English AI Master — Fases 1 a 4 (Fundação, Conversação, Teste de Nível, Gamificação)
+# English AI Master — Fases 1 a 5 (Fundação, Conversação, Teste de Nível, Gamificação, IA real)
 
 Scaffold inicial do app, seguindo a arquitetura definida no prompt mestre:
 React + Vite + TypeScript + Tailwind + Firebase, Clean Architecture, camadas
@@ -74,6 +74,51 @@ de abstração para IA e Voz (para nunca acoplar direto a Gemini/Vertex).
   (ou seja, a cada troca de página), não só uma vez por dia de fato — é seguro (idempotente),
   mas gera writes extras no Firestore. Para otimizar depois, dá pra mover esse registro para
   um contexto global que persiste entre navegações, em vez de rodar por página.
+
+## Fase 5 — IA real com Gemini ou Groq (novo)
+
+**Por que uma função serverless, e não a IA direto do navegador?** Chamar a API
+direto do front-end exigiria colocar a chave de API no bundle do JavaScript —
+qualquer pessoa poderia abrir o DevTools e roubá-la. A solução: **Netlify Functions**
+(`netlify/functions/`), que rodam no servidor do Netlify sob demanda (sem servidor
+pra manter) e são as únicas peças que conhecem a chave.
+
+Dois providers reais disponíveis, escolha um via `VITE_AI_PROVIDER`:
+
+| Provider | Função serverless | Modelo | Observação |
+|---|---|---|---|
+| `gemini` | `netlify/functions/chat.ts` | `gemini-2.0-flash` | Google AI Studio |
+| `groq` | `netlify/functions/chat-groq.ts` | `llama-3.3-70b-versatile` | Muito rápido, tier gratuito generoso |
+
+- **`netlify/functions/_shared/prompt.ts`**: instrução de sistema da professora de IA
+  (paciente, encorajadora, corrige com gentileza) e limpeza de JSON, compartilhadas
+  entre os dois providers — sem duplicar lógica.
+- **`src/ai/providers/gemini.provider.ts`** e **`groq.provider.ts`**: implementam
+  `AiTutorProvider` chamando `/api/chat` ou `/api/chat-groq` — nunca a API real direto.
+- **`netlify.toml`**: configurado com `[functions]` e um atalho `/api/*` →
+  `/.netlify/functions/:splat` (cobre ambas as funções automaticamente).
+- **`useConversation`**: tem fallback amigável se a IA falhar (chave não
+  configurada, erro de rede, etc.) — o chat nunca trava, só mostra uma mensagem gentil.
+
+### Como ativar (escolha um)
+
+**Groq** (recomendado pra começar: rápido e sem custo):
+1. Pegue sua chave em **https://console.groq.com/keys**.
+2. No Netlify → **Site settings → Environment variables**, adicione:
+   - `GROQ_API_KEY` = sua chave
+   - `VITE_AI_PROVIDER` = `groq`
+
+**Gemini**:
+1. Pegue sua chave em **https://aistudio.google.com/apikey**.
+2. No Netlify → **Site settings → Environment variables**, adicione:
+   - `GEMINI_API_KEY` = sua chave
+   - `VITE_AI_PROVIDER` = `gemini`
+
+Depois de qualquer um dos dois, dá um novo deploy (ou espera o próximo push disparar
+um automaticamente). Pra testar localmente, seria preciso o `netlify dev` (CLI do
+Netlify) rodando as functions — sem isso, `npm run dev` sozinho não acha `/api/chat*`
+e o provider cai no fallback amigável de erro. Não é obrigatório: dá pra desenvolver
+com `VITE_AI_PROVIDER=mock` localmente e testar a IA de verdade só depois do deploy.
 
 ## Deploy no Netlify
 
