@@ -4,13 +4,18 @@ import type { SpeechRecognizer, SpeechSynthesizer, SpeechRecognitionResult } fro
  * Implementação usando as Web Speech APIs nativas do navegador — sem custo,
  * disponível desde o primeiro dia. Pode ser substituída por um serviço mais
  * robusto (ex: Google Speech-to-Text) implementando os mesmos contratos.
+ *
+ * Nota: SpeechRecognition/SpeechRecognitionEvent não são APIs padronizadas
+ * pelo W3C, então os tipos do TypeScript para elas variam (ou nem existem)
+ * entre versões da lib DOM. Por isso usamos `any` isolado só aqui — o resto
+ * do app nunca vê esse `any`, só os tipos limpos definidos em speech.types.ts.
  */
 export class BrowserSpeechRecognizer implements SpeechRecognizer {
-  private recognition: SpeechRecognition | null = null;
+  private recognition: any = null;
 
   start(onResult: (result: SpeechRecognitionResult) => void): void {
-    const SpeechRecognitionCtor =
-      window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognitionCtor: any =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognitionCtor) {
       console.warn("[speech] Reconhecimento de fala não suportado neste navegador.");
@@ -18,16 +23,16 @@ export class BrowserSpeechRecognizer implements SpeechRecognizer {
     }
 
     this.recognition = new SpeechRecognitionCtor();
-    this.recognition!.lang = "en-US";
-    this.recognition!.continuous = false;
-    this.recognition!.interimResults = false;
+    this.recognition.lang = "en-US";
+    this.recognition.continuous = false;
+    this.recognition.interimResults = false;
 
-    this.recognition!.onresult = (event: SpeechRecognitionEvent) => {
+    this.recognition.onresult = (event: any) => {
       const result = event.results[0][0];
       onResult({ transcript: result.transcript, confidence: result.confidence });
     };
 
-    this.recognition!.start();
+    this.recognition.start();
   }
 
   stop(): void {
