@@ -1,4 +1,4 @@
-# English AI Master — Fases 1 a 6 (Fundação, Conversação, Teste de Nível, Gamificação, IA real, Revisão Espaçada)
+# English AI Master — Fases 1 a 12 (Fundação, Conversação, Teste de Nível, Gamificação, IA real, Revisão Espaçada, Shadowing, Estatísticas, Objetivos, Lições, Modo Imersão, Relatório/Modo Professor)
 
 Scaffold inicial do app, seguindo a arquitetura definida no prompt mestre:
 React + Vite + TypeScript + Tailwind + Firebase, Clean Architecture, camadas
@@ -139,6 +139,111 @@ totalmente automático — o aluno não precisa cadastrar vocabulário manualmen
   jogar um erro no console do navegador com um **link direto** pra criar o índice em 1
   clique (leva ~2 min pra ficar pronto). Alternativa: se você usa a Firebase CLI, o
   arquivo já está pronto pra `firebase deploy --only firestore:indexes`.
+
+## Fase 7 — Shadowing / Pronúncia (novo)
+
+- **`src/pages/Shadowing.tsx`**: mostra uma frase alvo do nível do aluno, ele ouve
+  (`BrowserSpeechSynthesizer`, já existia desde a Fase 1), grava a si mesmo repetindo
+  (`BrowserSpeechRecognizer`) e recebe uma nota de 0-100%.
+- **`src/utils/textSimilarity.ts`**: calcula a nota comparando a transcrição com a frase
+  alvo via distância de Levenshtein palavra-a-palavra (mais tolerante que letra-a-letra).
+  Feedback sempre encorajador (`PronunciationScore`), nunca aponta "erro", só convida a tentar de novo.
+- **`src/constants/shadowingPhrases.ts`**: banco de frases por nível CEFR (A0–C1).
+- Dá **+5 XP por tentativa** e desbloqueia a conquista "Primeira pronúncia".
+- Rota nova: `/pronuncia`, acessível pelo botão "Praticar pronúncia" no Dashboard.
+- **Limitação conhecida**: a Web Speech API (reconhecimento de fala nativo do navegador)
+  funciona bem no Chrome, mas tem suporte parcial/inexistente no Firefox e Safari. Para
+  produção com todos os navegadores, o próximo passo seria trocar por um serviço de
+  Speech-to-Text mais robusto — a abstração em `src/speech/` já foi feita pra isso: basta
+  criar um novo arquivo implementando `SpeechRecognizer`/`SpeechSynthesizer`.
+
+## Fase 8 — Estatísticas / Histórico (novo)
+
+- **`src/services/statistics.service.ts`**: registra atividade diária (`logActivity`) num
+  doc por usuário por dia (`uid_YYYY-MM-DD`, coleção `statistics`, já modelada desde a
+  Fase 1) e busca os últimos N dias preenchendo dias sem atividade com zero.
+- **Registro automático**, sem o aluno fazer nada: XP registrado dentro do próprio
+  `useGamification.awardXp`; mensagens de conversa em `Conversation.tsx`; tentativas de
+  shadowing em `Shadowing.tsx`; revisões concluídas em `useFlashcards.reviewCard`.
+- **`src/pages/Statistics.tsx`**: cartões de totais (sequência, XP total, conversas e
+  pronúncias nos últimos 7 dias) + gráfico de linha do XP diário (`recharts`, nova
+  dependência — biblioteca open-source, sem custo).
+- Rota nova: `/estatisticas`, acessível pelo botão "Ver progresso" no Dashboard.
+- **Mais um índice composto no Firestore** (`firestore.indexes.json` atualizado): a
+  consulta filtra `uid` + intervalo de `date` ao mesmo tempo. Mesma dica da Fase 6: se
+  o índice não existir, o Firestore mostra um link direto pra criar em 1 clique.
+
+## Fase 9 — Configurações + Objetivos do aluno (novo)
+
+- **`src/constants/goals.ts`**: catálogo de 8 objetivos (viajar, entrevistas, filmes,
+  músicas, morar fora, trabalho remoto, provas, amigos), cada um com um **tema de
+  conversação associado**.
+- **`src/pages/Settings.tsx`** + **`GoalSelector`**: o aluno escolhe quantos objetivos
+  quiser, em chips com ícone; salva no perfil (`UserProfileService.updateGoals`).
+- **Fecha o ciclo de personalização**: a Conversação agora escolhe o tema com base no
+  primeiro objetivo do aluno (ex: escolheu "Viajar" → a professora puxa assunto sobre
+  viagens). Sem objetivo definido, usa um tema neutro ("Daily routine").
+- Rota nova: `/configuracoes`, acessível pelo ícone de engrenagem na topbar
+  (`AppLayout`) — de propósito **não exige** teste de nível concluído, pra o aluno poder
+  ajustar objetivos a qualquer momento.
+
+## Fase 10 — Lições estruturadas (Gramática + Vocabulário em contexto) (novo)
+
+Até aqui só tínhamos conversa livre. Esta fase adiciona **lições fixas**, sempre
+ensinando através de frases em contexto — nunca listas de palavras soltas, seguindo o
+pilar do prompt mestre.
+
+- **`src/constants/curriculum.ts`**: 3 unidades (Vida diária/A1, Viagens/A2, Entrevistas
+  de emprego/B1), cada uma com lições. Cada lição tem uma frase de ensino + explicação
+  breve + 3 exercícios de múltipla escolha (reaproveita o `QuestionCard` já criado na
+  Fase 3, sem duplicar componente).
+- **`src/hooks/useLesson.ts`**: controla o fluxo ensino → exercícios → conclusão de uma
+  lição, calcula o % de acerto.
+- **`src/services/curriculum.service.ts`**: registra lições concluídas na coleção
+  `progress` (já modelada desde a Fase 1), um doc por `uid_lessonId`.
+- **`src/pages/Lessons.tsx`**: lista as unidades e lições, com checkmark nas concluídas.
+- **`src/pages/Lesson.tsx`**: tela de uma lição — dá **+20 XP** e desbloqueia a conquista
+  "Primeira lição" ao concluir; registra também nas Estatísticas (novo campo `lessons`
+  no `DailyStat`, mostrado como 5º cartão em `/estatisticas`).
+- Rotas novas: `/licoes` (lista) e `/licoes/:lessonId` (uma lição), acessíveis pelo botão
+  "Ver lições" no Dashboard.
+- **Fácil de expandir**: pra adicionar novas lições/unidades, só editar
+  `src/constants/curriculum.ts` — nenhum outro arquivo precisa mudar.
+
+## Fase 11 — Modo Imersão (novo)
+
+Um dos módulos citados no prompt mestre. Quando ativado, a professora de IA **nunca**
+responde em português nem traduz — só inglês, o tempo todo, mesmo se o aluno escrever
+em português.
+
+- **`src/components/ui/ToggleSwitch.tsx`**: switch reutilizável (novo componente de UI base).
+- **Configurações** (`/configuracoes`): novo toggle "Conversar só em inglês", salvo no
+  perfil (`immersionMode: boolean`, `UserProfileService.updateImmersionMode`).
+- **`AiTutorProvider.converse`** agora aceita um terceiro parâmetro opcional
+  (`{ immersionMode }`) — implementado em todos os providers (mock, Gemini, Groq) sem
+  quebrar compatibilidade (parâmetro opcional).
+- **`netlify/functions/_shared/prompt.ts`**: a instrução de sistema ganha regras extras
+  quando `immersionMode` está ativo, instruindo o modelo a nunca traduzir ou responder em
+  português.
+- A tela de Conversação mostra um indicador "🌊 Imersão" quando ativo, e a mensagem de
+  boas-vindas muda para inglês.
+
+## Fase 12 — Relatório / Modo Professor (novo)
+
+Junta dois itens que ainda faltavam do prompt mestre ("Relatórios" e "Modo Professor")
+numa única tela: um resumo completo e **imprimível** do progresso do aluno, pra mostrar a
+um professor de verdade ou compartilhar com quem acompanha os estudos.
+
+- **`src/pages/TeacherReport.tsx`**: nível + objetivos, XP total, sequência, lições
+  concluídas, gráfico de XP dos últimos 30 dias (reaproveita `XpTrendChart`), progresso
+  por unidade do currículo e a grade de conquistas — tudo numa tela só.
+- **Botão "Imprimir / salvar PDF"** usa `window.print()` — no diálogo de impressão do
+  navegador, escolher "Salvar como PDF" gera um arquivo pra enviar por e-mail/WhatsApp.
+- **Estilos de impressão** (`src/styles/index.css` + `no-print` no `AppLayout`): ao
+  imprimir, a topbar (tema, logout, XP badge) some, sobrando só o conteúdo do relatório.
+- **`XpTrendChart`** ganhou suporte a períodos maiores (30 dias): rótulos viram
+  dia/mês em vez de dia da semana, e o eixo X fica menos poluído.
+- Rota nova: `/relatorio`, acessível pelo botão "Relatório completo" no Dashboard.
 
 ## Deploy no Netlify
 
