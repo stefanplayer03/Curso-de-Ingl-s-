@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Perfil do usuário: leitura/escrita apenas pelo próprio dono.
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Dados pessoais de progresso, streaks, estatísticas, conquistas e conversas
+    // seguem o mesmo padrão: só o dono acessa, nada é público.
+    // Em `create` o documento ainda não existe, então validamos request.resource;
+    // em read/update/delete validamos o resource já salvo.
+    match /{collection}/{docId} {
+      allow create: if collection in [
+        'progress', 'streaks', 'statistics', 'achievements', 'conversations', 'settings', 'reviews'
+      ] && request.auth != null && request.resource.data.uid == request.auth.uid;
+
+      allow read, update, delete: if collection in [
+        'progress', 'streaks', 'statistics', 'achievements', 'conversations', 'settings', 'reviews'
+      ] && request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // Conteúdo pedagógico (lições, unidades, palavras, badges, missões) é
+    // somente leitura para usuários autenticados — escrita só via backend/admin.
+    match /{collection}/{docId} {
+      allow read: if collection in ['lessons', 'units', 'words', 'badges', 'missions']
+        && request.auth != null;
+      allow write: if false;
+    }
+  }
+}
